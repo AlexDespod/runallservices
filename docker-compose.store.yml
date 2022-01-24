@@ -1,0 +1,16 @@
+version: "3.5"
+
+services:
+  store:
+    image: postgres
+    restart: always
+    container_name: store
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    networks:
+      - gjg
+networks: 
+  gjg: 
+    external: true
+    name: gjg 

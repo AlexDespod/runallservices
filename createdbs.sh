@@ -1,0 +1,1 @@
+cat migrations/createdbs.sql | docker exec -i store psql -U admin

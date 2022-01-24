@@ -1,0 +1,120 @@
+version: "3.5"
+
+services:
+  pitboss:
+    container_name: pitboss
+    build:
+      context: ./dockerfiles/pitboss
+      dockerfile: Dockerfile
+    environment:
+      ENV: local
+      PITBOSS_PORT: 9999
+      PITBOSS_DB_HOST: store
+      PITBOSS_DB_USER: pitboss
+      PITBOSS_DB_NAME: pitboss
+      PITBOSS_DB_PASSWORD: pitboss
+      PITBOSS_DB_OPTIONS: sslmode=disable
+      REDIS_HOST: redis:6379
+      REDIS_PORT: 6379
+      DD_ENABLE: 'false'
+      HOST:  localhost:9999
+    ports:
+      - "8888:9999"
+    depends_on:
+      - redis
+    networks:
+      - gjg   
+  sbp:
+    container_name: sbp
+    build:
+      context: ./dockerfiles/sbp
+      dockerfile: Dockerfile
+    restart: always
+    networks:
+      - gjg
+    ports:
+      - "8082:8081"
+    environment:
+      DB_OPTIONS: "sslmode=disable port=5432"
+      DB_HOST: store
+      DB_USER: sbp
+      DB_PASSWORD: sbp
+      DB_NAME: sbp
+  redis:
+    container_name: redis
+    image: redis
+    restart: always
+    networks:
+      - gjg
+  speedwager:
+    container_name: speedwager
+    build:
+      context: ./dockerfiles/speedwager
+      dockerfile: Dockerfile
+      target: dev
+    restart: always
+    networks:
+      - gjg
+    ports:
+      - "2345:2345"   # Expose Delve debugger port.
+      - "50052:50051" # Expose grpc port.
+      - "1001:1001"   # Expose http monitoring server port.
+    #entrypoint: ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/app/speed-wager"] # uncomment this line to start container in debug mode
+    security_opt:
+      - "seccomp:unconfined" # Extra option to allow debugging.
+    cap_add:
+      - SYS_PTRACE # Recommended option for debugging only.
+    depends_on:
+      - pitboss
+      - redis
+    environment:
+      LAGER: DEBUG
+      DB_OPTIONS: "sslmode=disable port=5432"
+      DB_HOST: store
+      DB_USER: speedwager
+      DB_NAME: speedwager
+      DB_PASSWORD: speedwager
+      PITBOSS_URL: "http://pitboss:8888"
+      PITBOSS_CLIENT_TIMEOUT: "5s"
+      STORAGE_LAGER: "STOUT"
+      PITBOSS_LAGER: "STOUT"
+      SPEED_WAGER_LAGER: "STOUT"
+      SPEED_WAGER_ADDRESS: ":50051"
+      REDEEM_SESSION_TTL: "60s"
+      REDEEM_CHECK_PERIOD: "30s"
+      RECONCILIATION_CHECK_PERIOD: "30s"
+      STATFUL_DRY_RUN: "true"
+      STATFUL_API_HOST: "https://api.statful.com"
+      STATFUL_API_TOKEN: "4147bf1c-0b4b-46c3-bd71-943c05b40d88"
+      REDIS_HOST: redis:6379
+      REDIS_PASSWORD: ""
+      SBP_BASE_URL: "http://sbp:8081"
+      MONITORING_IDLE_TIMEOUT: 5m
+      MONITORING_READ_TIMEOUT: 5m
+      MONITORING_WRITE_TIMEOUT: 5m
+      ENV: "local"
+      DD_ENABLE: "false"
+  rng:
+    container_name: rng
+    build:
+      context: ./dockerfiles/rng
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      RNG_ID: "test"
+      RNG_RABBIT_DISABLED: "true"
+      RNG_RABBIT_URL: "amqp://127.0.0.1:5672/"
+      RNG_RABBIT_LAGER: "DEBUG"
+      RNG_CYCLER_DISABLED: "false"
+      MAX_COUNT: 1000
+      HOST: 0.0.0.0
+    ports:
+      - "9090:9090"
+    networks:
+      - gjg
+
+networks: 
+  gjg: 
+    external: true
+    name: gjg 
+
